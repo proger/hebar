@@ -67,14 +67,25 @@ libBI = unlib & Cabal.libBuildInfo
 
 exeBI :: PkgToInfo
 exeBI = unexe & Cabal.buildInfo
+ 
+allExtensions = Cabal.defaultExtensions <> Cabal.oldExtensions <> Cabal.otherExtensions
 
--- extensions, options, cSources, cIncludeDirs, cIncludes, otherModules :: Cabal.BuildInfo -> _
-extensions         = Cabal.otherExtensions & ((\(HS.EnableExtension x) -> show x) <$>)
+-- extensions, options, cSources, cIncludeDirs, cIncludes, otherModules, ghcOptions :: Cabal.BuildInfo -> _
+extensions         = allExtensions & ((\(HS.EnableExtension x) -> show x) <$>)
 options            = Cabal.options
 cSources           = Cabal.cSources
 cIncludeDirs       = Cabal.includeDirs
 cIncludes          = Cabal.includes
 otherModules       = Cabal.otherModules & (mod2s <$>)
+
+ghcOptions :: Cabal.BuildInfo -> [String]
+ghcOptions = options & mapMaybe isGhc & headOrEmpty
+  where
+    headOrEmpty [x] = x
+    headOrEmpty _ = []
+
+    isGhc (Compiler.GHC, x) = Just x
+    isGhc _ = Nothing
 
 libExportedModules :: GenericPackageDescription -> [String]
 libExportedModules = unlib & Cabal.exposedModules & (mod2s <$>)
@@ -88,13 +99,6 @@ exeMain = unexe & Cabal.modulePath
 exeName :: GenericPackageDescription -> String
 exeName = unexe & Cabal.exeName
 
-unGhcOptions = options & mapMaybe isGhc & headOrEmpty
-  where
-    headOrEmpty [x] = x
-    headOrEmpty _ = []
-
-    isGhc (Compiler.GHC, x) = Just x
-    isGhc _ = Nothing
 
 toArgs = intercalate " "
 
@@ -118,7 +122,7 @@ ghc p2i pkg modules = "ghc --make " <> defargs <> opts <> " " <> toArgs exts <> 
               <> "-optP-D -optP'MIN_VERSION_base(a,b,c)=1' "
 
     exts = ["-X" <> e | e <- extensions bi]
-    opts = toArgs $ unGhcOptions bi
+    opts = toArgs $ ghcOptions bi
     bi = p2i pkg
 
 cc :: Cabal.BuildInfo -> FilePath -> Command
