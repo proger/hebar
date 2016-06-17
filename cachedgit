@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+name=$1
+url=$2
+rev=$3
+CHECKOUT_DEST=$PWD
+
+git=${CACHEDGIT:-$HOME/.cachedgit}/${name}.git;
+
+[ ! -d ${git} ] && git init --bare ${git}
+
+env GIT_DIR=${git} git remote add ${name} ${url} 2>/dev/null || true
+env GIT_DIR=${git} git fetch ${name}
+
+commit=$(env GIT_DIR=${git} git rev-parse ${rev} 2>/dev/null)
+if [ $? -ne 0 ]; then
+	commit=$(env GIT_DIR=${git} git rev-parse ${name}/${rev} 2>/dev/null)
+	if [ $? -ne 0 ]; then
+		echo "$0: could not find commit for $rev (trying $name $url)" >&2
+		exit 1
+	fi
+fi
+
+if [ ! -d $CHECKOUT_DEST/${name} ]; then
+		(cd $CHECKOUT_DEST; git clone -n --shared ${git} ${name})
+fi
+(cd $CHECKOUT_DEST/${name}; git checkout "${commit}" -- .; git checkout "${commit}")
+
+# vim: ts=4 sw=4
